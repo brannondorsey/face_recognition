@@ -1,0 +1,11 @@
+python: 3.6
+cuda: 9.0
+entrypoint: python runway_model.py
+spec:
+  gpu: True
+  cpu: True
+build_steps:
+  - apt-get -y update
+  - apt-get install -y cmake
+  - pip install face_recognition
+  - pip install -r requirements.txt

@@ -23,7 +23,6 @@ def pil_rect_to_x_y_w_h(pil_rect):
 USE_CUDA = False
 LAST_LABEL_IMAGE_ARR = None
 LAST_LABEL_ENCODINGS = None
-FACE_MATCH_TOLERANCE = 0.6
 
 def get_model_kwargs():
     global USE_CUDA
@@ -34,17 +33,19 @@ def get_model_kwargs():
     else:
         return {}
 
-@runway.setup(options={ 'match_tolerance': number(min=0.1, max=1.0, step=0.1, default=FACE_MATCH_TOLERANCE) })
-def setup(opts):
+@runway.setup
+def setup():
     global USE_CUDA
-    global FACE_MATCH_TOLERANCE
     if dlib.cuda.get_num_devices() > 0 and dlib.DLIB_USE_CUDA:
         USE_CUDA = True
         print('CUDA detected, using CNN model...')
-    FACE_MATCH_TOLERANCE = opts['match_tolerance']
 
 # https://github.com/ageitgey/face_recognition/blob/c96b010c02f15e8eeb0f71308c641179ac1f19bb/examples/facerec_from_webcam_faster.py#L60
-identify_face_inputs = { 'input_image': image, 'label_image': image }
+identify_face_inputs = {
+    'input_image': image,
+    'label_image': image,
+    'match_tolerance': number(min=0.1, max=1.0, step=0.1, default=0.6)
+}
 identify_face_outputs = {
     'results': array(item_type=any),
     'size': any
@@ -72,12 +73,11 @@ def identify_face(model, args):
     height = input_arr.shape[0]
     results = []
     if len(input_encodings) > 0 and len(label_encodings) > 0:
-        global FACE_MATCH_TOLERANCE
         # compare the labeled encoding to each face found in the input image
         matches = face_recognition.compare_faces(
             input_encodings,
             label_encodings[0],
-            tolerance=FACE_MATCH_TOLERANCE)
+            tolerance=args['match_tolerance'])
         if True in matches:
             faces = [ pil_rect_to_x_y_w_h(fr_rect_to_pil_rect(face)) for face in input_locations ]
             match_index = matches.index(True)

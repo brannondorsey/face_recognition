@@ -1,4 +1,5 @@
 import os
+import dlib
 import face_recognition
 import numpy as np
 import runway
@@ -24,10 +25,24 @@ def pil_rect_to_x_y_w_h(pil_rect):
 if os.environ.get('RW_META') == '1':
     profile = lambda func: func
 
+use_cuda = False
+
+def get_model_kwargs():
+    global use_cuda
+    if use_cuda:
+        return {
+            'model': 'cnn'
+        }
+    else:
+        return {}
+
 @runway.setup
 @profile
 def setup():
-    pass
+    global use_cuda
+    if dlib.cuda.get_num_devices() > 0 and dlib.DLIB_USE_CUDA:
+        use_cuda = True
+        print('CUDA detected, using CNN model...')
 
 # https://github.com/ageitgey/face_recognition/blob/c96b010c02f15e8eeb0f71308c641179ac1f19bb/examples/facerec_from_webcam_faster.py#L60
 identify_face_inputs = { 'input_image': image, 'label_image': image }
@@ -40,7 +55,8 @@ identify_face_outputs = {
 def identify_face(model, args):
     input_arr = np.array(args['input_image'])
     label_arr = np.array(args['label_image'])
-    input_encodings = face_recognition.face_encodings(input_arr)
+    input_locations = face_recognition.face_locations(input_arr, **get_model_kwargs())
+    input_encodings = face_recognition.face_encodings(input_arr, known_face_locations=input_locations)
     label_encodings = face_recognition.face_encodings(label_arr)
 
     width = input_arr.shape[1]
@@ -50,8 +66,7 @@ def identify_face(model, args):
         # compare the labeled encoding to each face found in the input image
         matches = face_recognition.compare_faces(input_encodings, label_encodings[0])
         if True in matches:
-            faces = face_recognition.face_locations(input_arr)
-            faces = [ pil_rect_to_x_y_w_h(fr_rect_to_pil_rect(face)) for face in faces ]
+            faces = [ pil_rect_to_x_y_w_h(fr_rect_to_pil_rect(face)) for face in input_locations ]
             match_index = matches.index(True)
             results = [{ 'bbox': faces[match_index], 'class': 'Match Found' }]
     return { 'results': results, 'size': { 'width': width, 'height': height } }
@@ -67,7 +82,7 @@ def detect_faces(model, args):
     np_arr = np.array(args['image'])
     width = np_arr.shape[1]
     height = np_arr.shape[0]
-    faces = face_recognition.face_locations(np_arr)
+    faces = face_recognition.face_locations(np_arr, **get_model_kwargs())
 
     results = []
     faces = [ pil_rect_to_x_y_w_h(fr_rect_to_pil_rect(face)) for face in faces ]

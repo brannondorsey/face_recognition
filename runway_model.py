@@ -5,7 +5,6 @@ import numpy as np
 import runway
 from runway.data_types import category, image, vector, array, number, any
 from PIL import Image
-from profilehooks import profile
 
 # in: (top, right, bottom, left)
 # out: (left, top, right, bottom)
@@ -20,10 +19,6 @@ def pil_rect_to_x_y_w_h(pil_rect):
     w = pil_rect[2] - x
     h = pil_rect[3] - y
     return x, y, w, h
-
-
-if os.environ.get('RW_META') == '1':
-    profile = lambda func: func
 
 USE_CUDA = False
 LAST_LABEL_IMAGE_ARR = None
@@ -40,7 +35,6 @@ def get_model_kwargs():
         return {}
 
 @runway.setup(options={ 'match_tolerance': number(min=0.1, max=1.0, step=0.1, default=FACE_MATCH_TOLERANCE) })
-@profile
 def setup(opts):
     global USE_CUDA
     global FACE_MATCH_TOLERANCE
@@ -56,7 +50,6 @@ identify_face_outputs = {
     'size': any
 }
 @runway.command('identify_face', inputs=identify_face_inputs, outputs=identify_face_outputs)
-@profile
 def identify_face(model, args):
     input_arr = np.array(args['input_image'])
     label_arr = np.array(args['label_image'])
@@ -96,7 +89,6 @@ detect_faces_output = {
     'size': any
 }
 @runway.command('detect_faces', inputs={ 'image': image }, outputs=detect_faces_output)
-@profile
 def detect_faces(model, args):
 
     np_arr = np.array(args['image'])

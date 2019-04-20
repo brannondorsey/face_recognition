@@ -25,11 +25,13 @@ def pil_rect_to_x_y_w_h(pil_rect):
 if os.environ.get('RW_META') == '1':
     profile = lambda func: func
 
-use_cuda = False
+USE_CUDA = False
+LAST_LABEL_IMAGE_ARR = None
+LAST_LABEL_ENCODINGS = None
 
 def get_model_kwargs():
-    global use_cuda
-    if use_cuda:
+    global USE_CUDA
+    if USE_CUDA:
         return {
             'model': 'cnn'
         }
@@ -39,9 +41,9 @@ def get_model_kwargs():
 @runway.setup
 @profile
 def setup():
-    global use_cuda
+    global USE_CUDA
     if dlib.cuda.get_num_devices() > 0 and dlib.DLIB_USE_CUDA:
-        use_cuda = True
+        USE_CUDA = True
         print('CUDA detected, using CNN model...')
 
 # https://github.com/ageitgey/face_recognition/blob/c96b010c02f15e8eeb0f71308c641179ac1f19bb/examples/facerec_from_webcam_faster.py#L60
@@ -57,7 +59,18 @@ def identify_face(model, args):
     label_arr = np.array(args['label_image'])
     input_locations = face_recognition.face_locations(input_arr, **get_model_kwargs())
     input_encodings = face_recognition.face_encodings(input_arr, known_face_locations=input_locations)
-    label_encodings = face_recognition.face_encodings(label_arr)
+
+    global LAST_LABEL_IMAGE_ARR
+    global LAST_LABEL_ENCODINGS
+    label_encodings = None
+    # if the label image has changed, update the label encodings, otherwise use
+    # a the cached version of the encodings
+    if LAST_LABEL_IMAGE_ARR is None or not np.array_equal(LAST_LABEL_IMAGE_ARR, label_arr):
+        label_encodings = face_recognition.face_encodings(label_arr)
+        LAST_LABEL_ENCODINGS = label_encodings
+        LAST_LABEL_IMAGE_ARR = label_arr
+    else:
+        label_encodings = LAST_LABEL_ENCODINGS
 
     width = input_arr.shape[1]
     height = input_arr.shape[0]

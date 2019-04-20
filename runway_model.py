@@ -3,7 +3,7 @@ import dlib
 import face_recognition
 import numpy as np
 import runway
-from runway.data_types import category, image, vector, array, any
+from runway.data_types import category, image, vector, array, number, any
 from PIL import Image
 from profilehooks import profile
 
@@ -28,6 +28,7 @@ if os.environ.get('RW_META') == '1':
 USE_CUDA = False
 LAST_LABEL_IMAGE_ARR = None
 LAST_LABEL_ENCODINGS = None
+FACE_MATCH_TOLERANCE = 0.6
 
 def get_model_kwargs():
     global USE_CUDA
@@ -38,13 +39,15 @@ def get_model_kwargs():
     else:
         return {}
 
-@runway.setup
+@runway.setup(options={ 'match_tolerance': number(min=0.1, max=1.0, step=0.1, default=FACE_MATCH_TOLERANCE) })
 @profile
-def setup():
+def setup(opts):
     global USE_CUDA
+    global FACE_MATCH_TOLERANCE
     if dlib.cuda.get_num_devices() > 0 and dlib.DLIB_USE_CUDA:
         USE_CUDA = True
         print('CUDA detected, using CNN model...')
+    FACE_MATCH_TOLERANCE = opts['match_tolerance']
 
 # https://github.com/ageitgey/face_recognition/blob/c96b010c02f15e8eeb0f71308c641179ac1f19bb/examples/facerec_from_webcam_faster.py#L60
 identify_face_inputs = { 'input_image': image, 'label_image': image }
@@ -52,7 +55,7 @@ identify_face_outputs = {
     'results': array(item_type=any),
     'size': any
 }
-@runway.command('Identify_Face', inputs=identify_face_inputs, outputs=identify_face_outputs)
+@runway.command('identify_face', inputs=identify_face_inputs, outputs=identify_face_outputs)
 @profile
 def identify_face(model, args):
     input_arr = np.array(args['input_image'])
@@ -76,8 +79,12 @@ def identify_face(model, args):
     height = input_arr.shape[0]
     results = []
     if len(input_encodings) > 0 and len(label_encodings) > 0:
+        global FACE_MATCH_TOLERANCE
         # compare the labeled encoding to each face found in the input image
-        matches = face_recognition.compare_faces(input_encodings, label_encodings[0])
+        matches = face_recognition.compare_faces(
+            input_encodings,
+            label_encodings[0],
+            tolerance=FACE_MATCH_TOLERANCE)
         if True in matches:
             faces = [ pil_rect_to_x_y_w_h(fr_rect_to_pil_rect(face)) for face in input_locations ]
             match_index = matches.index(True)
@@ -88,7 +95,7 @@ detect_faces_output = {
     'results': array(item_type=any),
     'size': any
 }
-@runway.command('Detect_Faces', inputs={ 'image': image }, outputs=detect_faces_output)
+@runway.command('detect_faces', inputs={ 'image': image }, outputs=detect_faces_output)
 @profile
 def detect_faces(model, args):
 

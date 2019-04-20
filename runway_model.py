@@ -4,6 +4,7 @@ import numpy as np
 import runway
 from runway.data_types import category, image, vector, array, any
 from PIL import Image
+from profilehooks import profile
 
 # in: (top, right, bottom, left)
 # out: (left, top, right, bottom)
@@ -19,6 +20,15 @@ def pil_rect_to_x_y_w_h(pil_rect):
     h = pil_rect[3] - y
     return x, y, w, h
 
+
+if os.environ.get('RW_META') == '1':
+    profile = lambda func: func
+
+@runway.setup
+@profile
+def setup():
+    pass
+
 # https://github.com/ageitgey/face_recognition/blob/c96b010c02f15e8eeb0f71308c641179ac1f19bb/examples/facerec_from_webcam_faster.py#L60
 identify_face_inputs = { 'input_image': image, 'label_image': image }
 identify_face_outputs = {
@@ -26,6 +36,7 @@ identify_face_outputs = {
     'size': any
 }
 @runway.command('Identify_Face', inputs=identify_face_inputs, outputs=identify_face_outputs)
+@profile
 def identify_face(model, args):
     input_arr = np.array(args['input_image'])
     label_arr = np.array(args['label_image'])
@@ -50,6 +61,7 @@ detect_faces_output = {
     'size': any
 }
 @runway.command('Detect_Faces', inputs={ 'image': image }, outputs=detect_faces_output)
+@profile
 def detect_faces(model, args):
 
     np_arr = np.array(args['image'])
